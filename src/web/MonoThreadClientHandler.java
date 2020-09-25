@@ -30,6 +30,8 @@ public class MonoThreadClientHandler implements Runnable {
     private long _prevTime = 0;
     private long _startTime = 0;
 
+    private long _sum = 0;
+
     public MonoThreadClientHandler(Socket socket) {
         _client = socket;
     }
@@ -48,6 +50,8 @@ public class MonoThreadClientHandler implements Runnable {
             _fileName = _in.readUTF();
             _fileSize = _in.readLong();
 
+            _sum = 0;
+
             _bytesAmount += Integer.BYTES + _fileName.length() + Long.BYTES;
             _bytesPerTick += Integer.BYTES + _fileName.length() + Long.BYTES;
 
@@ -64,20 +68,44 @@ public class MonoThreadClientHandler implements Runnable {
             System.out.println("Current speed = " + getCurrentSpeed());
 
             try(OutputStream fout = Files.newOutputStream(_newFilePath)) {
-                while((msg_len = _in.read(_buffer)) != -1) {
+                long bytes_read = 0;
+                int bytes_to_read = getBytesLeft(bytes_read);
+                while(((msg_len = _in.read(_buffer, 0, bytes_to_read)) != -1) && (bytes_read < _fileSize)) {
+                    bytes_read += msg_len;
+                    System.out.println("Bytes read = " + bytes_read);
+                    bytes_to_read = getBytesLeft(bytes_read);
+                    updateSum(msg_len);
                     _bytesPerTick += msg_len;
                     _bytesAmount += msg_len;
                     fout.write(_buffer, 0, msg_len);
                     if(_bytesPerTick > 10000)System.out.println("Current speed = " + getCurrentSpeed()+ "Bps");
                 }
+            } catch (Exception e) {
+                e.printStackTrace();
             }
 
             System.out.println("Avg. Speed = " + (_bytesAmount / ((System.currentTimeMillis() - _startTime) / 1000f)) + "Bps");
+
+            System.out.println("Sum = " + _sum);
+
+            long clientSum = _in.readLong();
+
+            if(clientSum != _sum) {
+                _out.writeBoolean(false);
+            } else {
+                _out.writeBoolean(true);
+            }
+
+            _out.flush();
 
         } catch (IOException e) {
             e.printStackTrace();
         }
 
+    }
+
+    private int getBytesLeft(long bytes_read) {
+        return ((_fileSize - bytes_read) > (long)(_buffer.length)) ? _buffer.length : (int)(_fileSize - bytes_read);
     }
 
     private float getCurrentSpeed() {
@@ -87,5 +115,11 @@ public class MonoThreadClientHandler implements Runnable {
         float currentSpeed = _bytesPerTick / ((_deltaTime / 1000f));
         _bytesPerTick = 0;
         return  currentSpeed;
+    }
+
+    private void updateSum(int msg_len) {
+        for (int i = 0; i < msg_len; i++) {
+            _sum += _buffer[i];
+        }
     }
 }

@@ -16,6 +16,9 @@ public class Client extends Socket {
     private final int FILE_NAME_SIZE;
     private final String FILE_NAME;
     private byte[] _buffer = new byte[1024];
+    private long real_file_size = 0;
+
+    private long _sum = 0;
 
     public Client(String host, int port, String filePath) throws IOException {
         super(host, port);
@@ -45,14 +48,30 @@ public class Client extends Socket {
 
             _out.flush();
 
+            _sum = 0;
+
             if(_in.readBoolean()) {
                 int msg_len;
                 while ((msg_len = fileReader.read(_buffer)) != -1) {
+                    updateSum(msg_len);
                     _out.write(_buffer, 0, msg_len);
                 }
                 _out.flush();
             } else {
                 System.out.println("The file has already been created!");
+            }
+
+            _out.writeLong(_sum);
+            _out.flush();
+
+            System.out.println("Sum = " + _sum);
+            System.out.println("File Size = " + FILE_SIZE);
+            System.out.println("Real = " + real_file_size);
+
+            if(_in.readBoolean()) {
+                System.out.println("File successfully uploaded!");
+            } else {
+                System.out.println("File upload failed!");
             }
 
         } catch (IOException e) {
@@ -62,5 +81,12 @@ public class Client extends Socket {
 
     public void closeClient() throws IOException {
         this.close();
+    }
+
+    private void updateSum(int msg_len) {
+        for (int i = 0; i < msg_len; i++) {
+            _sum += _buffer[i];
+            real_file_size++;
+        }
     }
 }
