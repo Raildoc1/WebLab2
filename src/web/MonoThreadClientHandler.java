@@ -95,11 +95,16 @@ public class MonoThreadClientHandler implements Runnable {
             } else {
                 _out.writeBoolean(true);
             }
-
-            _out.flush();
-
         } catch (IOException e) {
             e.printStackTrace();
+        } finally {
+            try {
+                _out.flush();
+                _out.close();
+                _in.close();
+            } catch (IOException e) {
+                // IGNORE
+            }
         }
 
     }

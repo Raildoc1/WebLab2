@@ -76,10 +76,15 @@ public class Client extends Socket {
 
         } catch (IOException e) {
             e.printStackTrace();
+        } finally {
+            _out.close();
+            _in.close();
         }
     }
 
     public void closeClient() throws IOException {
+        _out.close();
+        _in.close();
         this.close();
     }
 
